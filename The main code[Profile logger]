@@ -1,0 +1,338 @@
+var username = location.pathname.split('/').filter(Boolean)[1];
+var base = 'https://scratch.mit.edu';
+var sleep = ms => new Promise(r => setTimeout(r, ms));
+
+var pathParts = location.pathname.split('/').filter(Boolean);
+if (pathParts[0] !== 'users' || pathParts.length < 2) {
+  var randomUsers = ['bob', 'griffpatch', 'ScratchCat', 'Will_Wam', 'ceebee', 'TimMcCool', 'Za-Chary'];
+  var random = randomUsers[Math.floor(Math.random() * randomUsers.length)];
+  alert('HEY HEY HEY this is supposed to work on PROFILES and not whatever you are on!\n\nTry it on a profile like this one:\nhttps://scratch.mit.edu/users/' + random);
+  throw new Error('Wrong page.');
+}
+
+if (!location.hostname.includes('scratch.mit.edu')) {
+  alert('HEY HEY HEY this only works on scratch.mit.edu!');
+  throw new Error('Wrong site.');
+}
+
+var mode = prompt('Scratch Profile Logger\n\nType "everything" or "necessities"', 'everything')?.toLowerCase().trim();
+
+if (!mode || (mode !== 'everything' && mode !== 'necessities')) {
+  console.warn('Invalid input. Type either everything or necessities.');
+  throw new Error('Aborted.');
+}
+
+console.clear();
+console.log('╔══════════════════════════════════════════╗\n   SCRATCH PROFILE LOGGER  v3.0\n   Mode   : ' + mode.toUpperCase() + '\n   Target : ' + username + '\n   Time   : ' + new Date().toLocaleTimeString() + '\n╚══════════════════════════════════════════╝\n');
+console.log('Fetching data, please wait...\n');
+await sleep(400);
+
+var bar = (msg) => console.log('  [ .. ] ' + msg);
+var ok  = (msg) => console.log('  [ OK ] ' + msg);
+var err = (msg) => console.log('  [ !! ] ' + msg);
+var inf = (msg) => console.log('  [ ?? ] ' + msg);
+
+bar('Connecting to Scratch API...');
+await sleep(300);
+
+var [userRes, followersRes, followingRes] = await Promise.all([
+  fetch('https://api.scratch.mit.edu/users/' + username),
+  fetch('https://api.scratch.mit.edu/users/' + username + '/followers?limit=40'),
+  fetch('https://api.scratch.mit.edu/users/' + username + '/following?limit=40')
+]);
+var userData      = await userRes.json();
+var followersData = await followersRes.json();
+var followingData = await followingRes.json();
+
+if (userData.code === 'NotFound') {
+  err('User "' + username + '" not found on Scratch -- aborting.');
+  throw new Error('User not found.');
+}
+
+ok('Core profile data loaded');
+await sleep(200);
+
+var projects = [], favs = [], studios = [], commentEls = [];
+
+if (mode === 'everything') {
+  bar('Fetching shared projects...');
+  await sleep(150);
+  try {
+    var projRes = await fetch('https://api.scratch.mit.edu/users/' + username + '/projects?limit=40');
+    projects = await projRes.json();
+    ok('Shared projects loaded  -->  ' + projects.length + ' found');
+  } catch(e) { err('Could not load projects'); }
+  await sleep(150);
+
+  bar('Fetching favorite projects...');
+  await sleep(150);
+  try {
+    var favRes = await fetch('https://api.scratch.mit.edu/users/' + username + '/favorites?limit=40');
+    favs = await favRes.json();
+    ok('Favorite projects loaded  -->  ' + favs.length + ' found');
+  } catch(e) { err('Could not load favorites'); }
+  await sleep(150);
+
+  bar('Fetching curated studios...');
+  await sleep(150);
+  try {
+    var scurateRes = await fetch('https://api.scratch.mit.edu/users/' + username + '/studios/curate?limit=20');
+    studios = await scurateRes.json();
+    ok('Studios loaded  -->  ' + studios.length + ' found');
+  } catch(e) { err('Could not load studios'); }
+  await sleep(150);
+
+  bar('Reading follower list...');
+  await sleep(150);
+  ok('Followers loaded  -->  ' + followersData.length + ' found');
+  await sleep(100);
+
+  bar('Reading following list...');
+  await sleep(150);
+  ok('Following loaded  -->  ' + followingData.length + ' found');
+  await sleep(100);
+
+  bar('Scraping comments from page DOM...');
+  await sleep(200);
+  commentEls = [...document.querySelectorAll('[data-comment-id]')].filter(el => el.querySelector('.info'));
+  ok('Comments scraped  -->  ' + commentEls.length + ' found');
+  await sleep(150);
+}
+
+bar('Reading DOM elements...');
+await sleep(200);
+var statusBadge      = document.querySelector('.group')?.innerText?.trim() || (userData.scratchteam ? 'Scratch Team' : 'Scratcher');
+var featuredLink     = document.querySelector('.featured-project a');
+var featuredTitle    = document.querySelector('.featured-project-name')?.innerText?.trim();
+var commentsDisabled = !!document.querySelector('.comments-off, .comment-turned-off') || document.querySelector('.comments')?.innerText?.toLowerCase().includes('turned off');
+var reportBtn        = document.querySelector('[data-control="report"], .report-profile');
+ok('DOM elements read');
+await sleep(200);
+
+var joined   = new Date(userData.history.joined);
+var joinDate = joined.getFullYear() + '/' + String(joined.getMonth()+1).padStart(2,'0') + '/' + String(joined.getDate()).padStart(2,'0');
+
+var now         = new Date();
+var accountAge  = Math.floor((now - joined) / (1000 * 60 * 60 * 24));
+var ageYears    = Math.floor(accountAge / 365);
+var ageMonths   = Math.floor((accountAge % 365) / 30);
+var ageDays     = accountAge % 30;
+var ageString   = '';
+if (ageYears > 0)  ageString += ageYears  + ' year'  + (ageYears  > 1 ? 's' : '') + ' ';
+if (ageMonths > 0) ageString += ageMonths + ' month' + (ageMonths > 1 ? 's' : '') + ' ';
+if (ageDays > 0)   ageString += ageDays   + ' day'   + (ageDays   > 1 ? 's' : '');
+ageString = ageString.trim() || 'less than a day';
+
+bar('Building output...');
+await sleep(400);
+
+console.clear();
+console.log('╔══════════════════════════════════════════╗\n  ✅ LOADING COMPLETE -- ' + username + '\n╚══════════════════════════════════════════╝\n');
+await sleep(200);
+
+console.log('╔══════════════════════════════════════╗\n   SCRATCH PROFILE: ' + username + '\n╚══════════════════════════════════════╝');
+console.log('Username   : ' + userData.username);
+console.log('User ID    : ' + userData.id);
+console.log('Status     : ' + statusBadge);
+console.log('Country    : ' + (userData.profile.country || 'Unknown'));
+console.log('Joined     : ' + joinDate + '  (' + ageString + ' ago)');
+console.log('Scratch Team: ' + (userData.scratchteam ? 'YES' : 'No'));
+console.log('Profile URL: ' + base + '/users/' + username);
+console.log('Avatar URL : ' + userData.profile.images['90x90']);
+
+console.log('\n── About Me ──\n' + (userData.profile.bio || '(empty)'));
+console.log('\n── What I Am Working On ──\n' + (userData.profile.status || '(empty)'));
+
+if (mode === 'necessities') {
+  console.log('\nNecessities logged. Run again with everything for full data.');
+  throw new Error('DONE');
+}
+
+console.log('\n── Why I Scratch ──');
+var whyScratch = (() => {
+  var headers = document.querySelectorAll('h4');
+  for (var h of headers) {
+    if (h.innerText?.toLowerCase().includes('why i scratch')) {
+      return h.closest('.box, .profile-info, section')?.querySelector('p, .overview, span, .bio')?.innerText?.trim();
+    }
+  }
+  return null;
+})() || '(empty or New Scratcher)';
+console.log(whyScratch);
+
+console.log('\n── Shared Projects (' + projects.length + ') ──');
+if (projects.length === 0) {
+  console.log('  (none)');
+} else {
+  var totalViews = 0, totalLoves = 0, totalFaves = 0, totalRemixes = 0;
+  projects.forEach(function(p) {
+    totalViews   += p.stats.views     || 0;
+    totalLoves   += p.stats.loves     || 0;
+    totalFaves   += p.stats.favorites || 0;
+    totalRemixes += p.stats.remixes   || 0;
+    console.log('  📁 ' + p.title);
+    console.log('     URL      : ' + base + '/projects/' + p.id);
+    console.log('     Views    : ' + p.stats.views + ' | Loves: ' + p.stats.loves + ' | Faves: ' + p.stats.favorites + ' | Remixes: ' + p.stats.remixes);
+    console.log('     Created  : ' + p.history.created.slice(0,10) + ' | Modified: ' + p.history.modified.slice(0,10));
+  });
+  var topProject = projects.reduce(function(a, b) { return (a.stats.views > b.stats.views ? a : b); });
+  console.log('');
+  console.log('  ┌─ Total across all projects ─────────────────');
+  console.log('  │  Views   : ' + totalViews);
+  console.log('  │  Loves   : ' + totalLoves);
+  console.log('  │  Faves   : ' + totalFaves);
+  console.log('  │  Remixes : ' + totalRemixes);
+  console.log('  │');
+  console.log('  │  Most viewed: ' + topProject.title + ' (' + topProject.stats.views + ' views)');
+  console.log('  │  URL        : ' + base + '/projects/' + topProject.id);
+  console.log('  └─────────────────────────────────────────────');
+}
+
+console.log('\n── Favorite Projects (' + favs.length + ') ──');
+if (favs.length === 0) {
+  console.log('  (none)');
+} else {
+  favs.forEach(function(p) {
+    console.log('  ⭐ ' + p.title + ' by ' + p.author.username);
+    console.log('     URL: ' + base + '/projects/' + p.id);
+  });
+}
+
+console.log('\n── Studios Following ──');
+var studioFollowSection = (() => {
+  var headings = document.querySelectorAll('h4');
+  for (var h of headings) {
+    if (h.innerText?.toLowerCase().includes('studios i') && h.innerText?.toLowerCase().includes('following')) {
+      return h.closest('.box, section');
+    }
+  }
+  return null;
+})();
+var followedStudios = studioFollowSection?.querySelectorAll('a[href*="/studios/"]');
+if (followedStudios && followedStudios.length > 0) {
+  followedStudios.forEach(function(s) {
+    var title = s.querySelector('img')?.alt || s.innerText?.trim() || 'Unknown';
+    var href  = s.getAttribute('href');
+    console.log('  🎬 ' + title);
+    if (href) console.log('     URL: ' + (href.startsWith('http') ? href : base + href));
+  });
+} else {
+  console.log('  (none or not a Scratcher)');
+}
+
+console.log('\n── Studios Curating (' + (Array.isArray(studios) ? studios.length : 0) + ') ──');
+if (!Array.isArray(studios) || studios.length === 0) {
+  console.log('  (none)');
+} else {
+  studios.forEach(function(s) {
+    console.log('  🏛 ' + s.title);
+    console.log('     URL        : ' + base + '/studios/' + s.id);
+    console.log('     Description: ' + (s.description || '(none)'));
+  });
+}
+
+console.log('\n── Following (' + followingData.length + ') ──');
+if (followingData.length === 0) {
+  console.log('  (none)');
+} else {
+  followingData.forEach(function(u) {
+    console.log('  👤 ' + u.username + ' -- ' + base + '/users/' + u.username);
+  });
+}
+
+console.log('\n── Followers (' + followersData.length + ' shown) ──');
+if (followersData.length === 0) {
+  console.log('  (none)');
+} else {
+  followersData.forEach(function(u) {
+    console.log('  👤 ' + u.username + ' -- ' + base + '/users/' + u.username);
+  });
+}
+
+var followRatio = followingData.length > 0 ? (followersData.length / followingData.length).toFixed(2) : 'N/A';
+console.log('\n  Follow ratio (followers / following): ' + followRatio);
+
+console.log('\n── Featured Project ──');
+if (featuredLink) {
+  console.log('  🎮 ' + (featuredTitle || 'Unknown'));
+  console.log('     URL: ' + base + featuredLink.getAttribute('href'));
+} else {
+  console.log('  (none set)');
+}
+
+console.log('\n── Recent Activity ──');
+var activityItems = document.querySelectorAll('.activity-rows .event, .news li, #activity ul li');
+if (activityItems.length > 0) {
+  activityItems.forEach(function(item, i) {
+    console.log('  [' + (i+1) + '] ' + item.innerText.trim().replace(/\s+/g, ' '));
+  });
+} else {
+  console.log('  (not accessible via script)');
+}
+
+console.log('\n── Comments ──');
+if (commentsDisabled && commentEls.length === 0) {
+  console.log('  Error 001: User disabled comments and no previous comments exist');
+} else {
+  if (commentsDisabled) {
+    console.log('  Notice: New comments are disabled -- showing existing comments\n');
+  }
+  if (commentEls.length === 0) {
+    console.log('  (no comments found)');
+  } else {
+    var topLevel = commentEls.filter(function(c) {
+      var commentId = c.getAttribute('data-comment-id');
+      var parentId  = c.querySelector('.reply')?.getAttribute('data-parent-thread');
+      return commentId === parentId;
+    });
+    var replies = commentEls.filter(function(c) {
+      var commentId = c.getAttribute('data-comment-id');
+      var parentId  = c.querySelector('.reply')?.getAttribute('data-parent-thread');
+      return commentId !== parentId;
+    });
+
+    console.log('  Showing ' + topLevel.length + ' top-level comments with ' + replies.length + ' replies:\n');
+
+    topLevel.forEach(function(c, i) {
+      var author    = c.querySelector('[data-comment-user]')?.getAttribute('data-comment-user') || c.querySelector('.name a')?.innerText?.trim() || 'Unknown';
+      var contentEl = c.querySelector('.info .content');
+      var content   = contentEl?.innerText?.trim().replace(/\s+/g, ' ') || '(empty)';
+      var timeEl    = c.querySelector('.time');
+      var time      = timeEl?.getAttribute('title') || timeEl?.innerText?.trim() || 'Unknown';
+      var commentId = c.getAttribute('data-comment-id');
+
+      console.log('  [' + (i+1) + '] ' + author + ' (' + time + '):');
+      console.log('       "' + content + '"');
+      console.log('       Profile   : ' + base + '/users/' + author);
+      console.log('       Comment ID: ' + commentId);
+
+      var threadReplies = replies.filter(function(r) {
+        return r.querySelector('.reply')?.getAttribute('data-parent-thread') === commentId;
+      });
+
+      if (threadReplies.length > 0) {
+        console.log('       Replies (' + threadReplies.length + '):');
+        threadReplies.forEach(function(r) {
+          var rAuthor    = r.querySelector('[data-comment-user]')?.getAttribute('data-comment-user') || r.querySelector('.name a')?.innerText?.trim() || 'Unknown';
+          var rContentEl = r.querySelector('.info .content');
+          var rContent   = rContentEl?.innerText?.trim().replace(/\s+/g, ' ') || '(empty)';
+          var rTimeEl    = r.querySelector('.time');
+          var rTime      = rTimeEl?.getAttribute('title') || rTimeEl?.innerText?.trim() || 'Unknown';
+          var rId        = r.getAttribute('data-comment-id');
+          console.log('         └ ' + rAuthor + ' (' + rTime + '): "' + rContent + '"');
+          console.log('           Profile   : ' + base + '/users/' + rAuthor);
+          console.log('           Comment ID: ' + rId);
+        });
+      }
+    });
+  }
+}
+
+console.log('\n── Other ──');
+console.log('  Report Button  : ' + (reportBtn ? 'present on page (built into page UI -- no direct URL)' : 'not found on page'));
+console.log('  Logged at      : ' + new Date().toLocaleString());
+console.log('  Direct API URL : https://api.scratch.mit.edu/users/' + username);
+
+console.log('\n╔══════════════════════════════════════╗');
+console.log('   Done! Logged profile: ' + username);
+console.log('╚══════════════════════════════════════╝');
