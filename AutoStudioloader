@@ -1,0 +1,80 @@
+// ============================================================
+//  Scratch Studio — Auto Load More
+//  Paste this into the browser console while on a Scratch
+//  studio page (https://scratch.mit.edu/studios/XXXXXXX/)
+// ============================================================
+
+(function () {
+  // How long to wait between each click (ms). Lower = faster,
+  // but too low may get rate-limited by Scratch's API.
+  const DELAY_MS = 1200;
+
+  // Max clicks as a safety cap (0 = unlimited)
+  const MAX_CLICKS = 0;
+
+  let clicks = 0;
+  let intervalId = null;
+
+  function findLoadMoreButton() {
+    // Scratch renders the button as a button element whose
+    // visible text contains "Load more" (case-insensitive).
+    return [...document.querySelectorAll("button")].find(
+      (btn) => /load\s*more/i.test(btn.innerText)
+    );
+  }
+
+  function tick() {
+    const btn = findLoadMoreButton();
+
+    if (!btn) {
+      console.log(
+        `%c✅ All projects loaded! (${clicks} load${clicks !== 1 ? "s" : ""} triggered)`,
+        "color: #4ade80; font-weight: bold; font-size: 14px;"
+      );
+      clearInterval(intervalId);
+      return;
+    }
+
+    if (MAX_CLICKS > 0 && clicks >= MAX_CLICKS) {
+      console.log(
+        `%c🛑 Reached safety cap of ${MAX_CLICKS} clicks.`,
+        "color: #f87171; font-weight: bold;"
+      );
+      clearInterval(intervalId);
+      return;
+    }
+
+    if (btn.disabled) {
+      // Button exists but is temporarily disabled (loading in progress)
+      return;
+    }
+
+    btn.click();
+    clicks++;
+    console.log(
+      `%c⬇ Load More clicked (${clicks})`,
+      "color: #60a5fa; font-size: 12px;"
+    );
+  }
+
+  // Kick things off
+  console.log(
+    "%c🚀 Scratch Auto-Load starting…",
+    "color: #facc15; font-weight: bold; font-size: 14px;"
+  );
+  intervalId = setInterval(tick, DELAY_MS);
+
+  // Expose a stop handle in case you want to cancel early
+  window._stopAutoLoad = () => {
+    clearInterval(intervalId);
+    console.log(
+      `%c⏹ Stopped after ${clicks} click${clicks !== 1 ? "s" : ""}.`,
+      "color: #f97316; font-weight: bold;"
+    );
+  };
+
+  console.log(
+    "%cTip: run  window._stopAutoLoad()  at any time to cancel.",
+    "color: #a78bfa; font-size: 11px;"
+  );
+})();
